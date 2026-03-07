@@ -1,0 +1,136 @@
+# X API v2 Sample Code Repository
+
+> This file provides context for LLMs (Large Language Models) to understand and navigate this codebase.
+
+## Purpose
+
+This repository contains working code examples for the X (formerly Twitter) API v2. Examples are provided in Python.
+
+## Repository Structure
+
+```
+/
+├── python/           # Python examples
+│   ├── posts/        # Create, delete, search, lookup posts
+│   ├── users/        # User lookup, followers, blocks, mutes
+│   ├── timelines/    # User posts, mentions, home timeline
+│   ├── streams/      # Filtered and sampled streams
+│   ├── bookmarks/    # Bookmark management
+│   ├── spaces/       # Spaces lookup and search
+│   ├── lists/        # List management
+│   ├── direct_messages/  # DM lookup and sending
+│   ├── media/        # Media upload
+│   ├── compliance/   # Batch compliance jobs
+└───└── usage/        # API usage stats
+
+```
+
+## File Naming Conventions
+
+- Python: `snake_case.py` (e.g., `create_post.py`)
+
+## Authentication Types
+
+1. **Bearer Token** (App-only): For read-only endpoints that don't require user context
+   - Env var: `BEARER_TOKEN`
+   
+2. **OAuth 1.0a** (User Context): For endpoints that act on behalf of a user
+   - Env vars: `CONSUMER_KEY`, `CONSUMER_SECRET`
+   
+3. **OAuth 2.0 with PKCE** (User Context): For newer endpoints like bookmarks
+   - Requires OAuth 2.0 flow to get user access token
+
+## API Base URL
+
+All endpoints use: `https://api.x.com/2/`
+
+## Key Terminology (Rebrand)
+
+| Old Term | New Term |
+|----------|----------|
+| Tweet | Post |
+| Retweet | Repost |
+| Twitter | X |
+| TwitterDev | XDevelopers |
+
+Note: The API endpoints still use `/tweets/` in the URL path for backwards compatibility.
+
+## Common Operations by Category
+
+### Posts (formerly Tweets)
+- `POST /2/tweets` - Create a post
+- `DELETE /2/tweets/:id` - Delete a post
+- `GET /2/tweets` - Look up posts by ID
+- `GET /2/tweets/search/recent` - Search recent posts (7 days)
+- `GET /2/tweets/search/all` - Search all posts (Academic access)
+- `GET /2/tweets/counts/recent` - Count recent posts
+- `GET /2/tweets/:id/quote_tweets` - Get quote posts
+- `POST /2/users/:id/retweets` - Repost
+- `DELETE /2/users/:id/retweets/:tweet_id` - Undo repost
+
+### Users
+- `GET /2/users/by` - Look up users by username
+- `GET /2/users/me` - Get authenticated user
+- `GET /2/users/:id/followers` - Get followers
+- `GET /2/users/:id/following` - Get following
+- `POST /2/users/:id/blocking` - Block user
+- `POST /2/users/:id/muting` - Mute user
+
+### Timelines
+- `GET /2/users/:id/tweets` - User's posts
+- `GET /2/users/:id/mentions` - User's mentions
+- `GET /2/users/:id/reverse_chronological_timeline` - Home timeline
+
+### Streams (Real-time)
+- `GET /2/tweets/search/stream` - Filtered stream
+- `GET /2/tweets/sample/stream` - 1% sampled stream
+
+### Likes
+- `POST /2/users/:id/likes` - Like a post
+- `DELETE /2/users/:id/likes/:tweet_id` - Unlike a post
+- `GET /2/tweets/:id/liking_users` - Users who liked
+- `GET /2/users/:id/liked_tweets` - Posts user liked
+
+### Bookmarks
+- `GET /2/users/:id/bookmarks` - Get bookmarks
+- `POST /2/users/:id/bookmarks` - Create bookmark
+- `DELETE /2/users/:id/bookmarks/:tweet_id` - Delete bookmark
+
+### Lists
+- `GET /2/lists/:id` - Look up list
+- `POST /2/lists` - Create list
+- `DELETE /2/lists/:id` - Delete list
+
+### Spaces
+- `GET /2/spaces` - Look up Spaces by ID
+- `GET /2/spaces/search` - Search Spaces
+
+### Direct Messages
+- `GET /2/dm_events` - Get DM events
+- `POST /2/dm_conversations/with/:participant_id/messages` - Send DM
+
+## Quick Start
+
+1. Get API credentials at https://developer.x.com/portal
+2. Set environment variables:
+   ```bash
+   export BEARER_TOKEN='your_token'
+   export CONSUMER_KEY='your_key'
+   export CONSUMER_SECRET='your_secret'
+   ```
+3. Navigate to desired language folder
+4. Install dependencies (see language-specific README)
+5. Run example
+
+## Dependencies
+
+### Python
+```bash
+pip install requests requests-oauthlib
+```
+
+## External Resources
+
+- API Documentation: https://developer.x.com/en/docs/twitter-api
+- Developer Portal: https://developer.x.com/en/portal/dashboard
+- API Reference: https://developer.x.com/en/docs/api-reference-index
