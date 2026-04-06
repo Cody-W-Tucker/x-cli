@@ -325,18 +325,76 @@ class XApiClient:
 
     # ---- bookmarks (OAuth 2.0 User Context) ----
 
-    def get_bookmarks(self, max_results: int = 10) -> dict[str, Any]:
+    def get_bookmarks(
+        self, max_results: int = 10, pagination_token: str | None = None
+    ) -> dict[str, Any]:
         user_id = self._get_user_id(oauth2=True)
         max_results = max(1, min(max_results, 100))
-        params = {
+        params: dict[str, str] = {
             "max_results": str(max_results),
             "tweet.fields": "created_at,public_metrics,author_id,conversation_id,entities,lang,note_tweet",
             "expansions": "author_id,attachments.media_keys",
             "user.fields": "name,username,verified,profile_image_url",
             "media.fields": "url,preview_image_url,type",
         }
+        if pagination_token:
+            params["pagination_token"] = pagination_token
         url = self._query_url(f"{API_BASE}/users/{user_id}/bookmarks", params)
         return self._oauth2_user_request("GET", url)
+
+    def get_all_bookmarks(self, max_results: int = 100) -> dict[str, Any]:
+        """Fetch all bookmarks with auto-pagination."""
+        all_data: list[dict] = []
+        all_users: list[dict] = []
+        all_media: list[dict] = []
+        next_token: str | None = None
+        page_count = 0
+
+        while True:
+            page_count += 1
+            result = self.get_bookmarks(
+                max_results=max_results, pagination_token=next_token
+            )
+
+            data = result.get("data", [])
+            if not data:
+                break
+
+            all_data.extend(data)
+
+            # Accumulate includes
+            includes = result.get("includes", {})
+            if includes.get("users"):
+                all_users.extend(includes["users"])
+            if includes.get("media"):
+                all_media.extend(includes["media"])
+
+            # Check for next page
+            next_token = result.get("meta", {}).get("next_token")
+            if not next_token:
+                break
+
+        # Deduplicate users and media by id
+        seen_users = {}
+        for u in all_users:
+            uid = u.get("id")
+            if uid and uid not in seen_users:
+                seen_users[uid] = u
+
+        seen_media = {}
+        for m in all_media:
+            mid = m.get("media_key")
+            if mid and mid not in seen_media:
+                seen_media[mid] = m
+
+        return {
+            "data": all_data,
+            "includes": {
+                "users": list(seen_users.values()),
+                "media": list(seen_media.values()),
+            },
+            "meta": {"result_count": len(all_data), "pages_fetched": page_count},
+        }
 
     def bookmark_tweet(self, tweet_id: str) -> dict[str, Any]:
         user_id = self._get_user_id(oauth2=True)

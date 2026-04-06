@@ -17,9 +17,17 @@
 
     pyproject-build-systems = {
       url = "github:pyproject-nix/build-system-pkgs";
-      inputs.pyproject-nix.follows = "pyproject-nix";
-      inputs.uv2nix.follows = "uv2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
+      inputs = {
+        nixpkgs = {
+          follows = "nixpkgs";
+        };
+        pyproject-nix = {
+          follows = "pyproject-nix";
+        };
+        uv2nix = {
+          follows = "uv2nix";
+        };
+      };
     };
   };
 
@@ -40,7 +48,7 @@
 
       # Create overlay from lock file (builds packages as nix derivations)
       overlay = workspace.mkPyprojectOverlay {
-        sourcePreference = "wheel";  # Use wheels for faster builds
+        sourcePreference = "wheel"; # Use wheels for faster builds
       };
 
       # Editable overlay for development (points to src/)
@@ -53,7 +61,7 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          python = pkgs.python313;  # Match your Python version
+          python = pkgs.python313; # Match your Python version
         in
         (pkgs.callPackage pyproject-nix.build.packages {
           inherit python;
@@ -82,10 +90,10 @@
               virtualenv
               pkgs.uv
               pkgs.basedpyright
-              pkgs.ruff  # Keep ruff in nix for editor integration
+              pkgs.ruff # Keep ruff in nix for editor integration
             ];
             env = {
-              UV_NO_SYNC = "1";  # Don't sync, use nix-built venv
+              UV_NO_SYNC = "1"; # Don't sync, use nix-built venv
               UV_PYTHON = pythonSet.python.interpreter;
               UV_PYTHON_DOWNLOADS = "never";
             };

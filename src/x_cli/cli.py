@@ -379,10 +379,20 @@ def me_mentions(state, max_results):
 
 @me.command("bookmarks")
 @click.option("--max", "max_results", default=10, type=int, help="Max results (1-100)")
+@click.option(
+    "--all",
+    "fetch_all",
+    is_flag=True,
+    default=False,
+    help="Fetch all bookmarks (auto-pagination)",
+)
 @pass_state
-def me_bookmarks(state, max_results):
+def me_bookmarks(state, max_results, fetch_all):
     """Fetch your bookmarks."""
-    data = state.client.get_bookmarks(max_results)
+    if fetch_all:
+        data = state.client.get_all_bookmarks(max_results=100)
+    else:
+        data = state.client.get_bookmarks(max_results)
     state.output(data, "Bookmarks")
 
 

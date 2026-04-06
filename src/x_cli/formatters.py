@@ -12,6 +12,7 @@ from rich.table import Table
 
 # ---- JSON ----
 
+
 def output_json(data: Any, verbose: bool = False) -> None:
     """Raw JSON to stdout."""
     if not verbose and isinstance(data, dict):
@@ -25,6 +26,7 @@ def output_json(data: Any, verbose: bool = False) -> None:
 
 # ---- Plain/TSV ----
 
+
 def output_plain(data: Any, verbose: bool = False) -> None:
     """TSV output for piping."""
     if isinstance(data, dict):
@@ -32,28 +34,41 @@ def output_plain(data: Any, verbose: bool = False) -> None:
         if inner is None:
             inner = data
         if isinstance(inner, list):
-            _plain_list(inner, verbose)
+            _plain_list(inner, verbose, data if isinstance(data, dict) else None)
         elif isinstance(inner, dict):
             _plain_dict(inner, verbose)
         else:
             print(inner)
     elif isinstance(data, list):
-        _plain_list(data, verbose)
+        _plain_list(data, verbose, None)
     else:
         print(data)
 
 
 def _plain_dict(d: dict, verbose: bool = False) -> None:
-    skip = set() if verbose else {"public_metrics", "entities", "edit_history_tweet_ids", "attachments", "referenced_tweets", "profile_image_url"}
+    skip = (
+        set()
+        if verbose
+        else {
+            "public_metrics",
+            "entities",
+            "edit_history_tweet_ids",
+            "attachments",
+            "referenced_tweets",
+            "profile_image_url",
+        }
+    )
     for k, v in d.items():
         if not verbose and k in skip:
             continue
         if isinstance(v, (dict, list)):
             v = json.dumps(v, default=str)
+        # Sanitize for TSV: replace newlines and tabs with spaces
+        v = str(v).replace("\n", " ").replace("\r", " ").replace("\t", " ")
         print(f"{k}\t{v}")
 
 
-def _plain_list(items: list, verbose: bool = False) -> None:
+def _plain_list(items: list, verbose: bool = False, data: dict | None = None) -> None:
     if not items:
         return
     if not isinstance(items[0], dict):
@@ -69,21 +84,45 @@ def _plain_list(items: list, verbose: bool = False) -> None:
         if "username" in items[0]:
             keys = [k for k in ["username", "name", "description"] if k in all_keys]
         else:
-            keys = [k for k in ["id", "author_id", "text", "created_at"] if k in all_keys]
+            keys = [
+                k for k in ["id", "author_id", "text", "created_at"] if k in all_keys
+            ]
         if not keys:
             keys = all_keys
+
+    # Check if we can add URLs for tweets (need includes.users to build URLs)
+    includes = data.get("includes", {}) if data else {}
+    users = includes.get("users", [])
+    has_tweets = items and "id" in items[0] and "author_id" in items[0]
+
+    if has_tweets and users and not verbose:
+        # Build author_id -> username mapping
+        author_map = {u.get("id"): u.get("username") for u in users}
+        keys = ["url"] + [k for k in keys if k != "url"]
+    else:
+        author_map = {}
+
     print("\t".join(keys))
     for item in items:
         vals = []
         for k in keys:
-            v = item.get(k, "")
-            if isinstance(v, (dict, list)):
-                v = json.dumps(v, default=str)
-            vals.append(str(v))
+            if k == "url" and has_tweets and author_map:
+                tweet_id = item.get("id", "")
+                author_id = item.get("author_id", "")
+                username = author_map.get(author_id, "")
+                v = f"https://x.com/{username}/status/{tweet_id}" if username else ""
+            else:
+                v = item.get(k, "")
+                if isinstance(v, (dict, list)):
+                    v = json.dumps(v, default=str)
+                # Sanitize for TSV: replace newlines and tabs with spaces
+                v = str(v).replace("\n", " ").replace("\r", " ").replace("\t", " ")
+            vals.append(v)
         print("\t".join(vals))
 
 
 # ---- Markdown ----
+
 
 def output_markdown(data: Any, title: str = "", verbose: bool = False) -> None:
     """Markdown output to stdout."""
@@ -109,14 +148,18 @@ def output_markdown(data: Any, title: str = "", verbose: bool = False) -> None:
         print(str(data))
 
 
-def _md_single(item: dict, includes: dict, title: str = "", verbose: bool = False) -> None:
+def _md_single(
+    item: dict, includes: dict, title: str = "", verbose: bool = False
+) -> None:
     if "username" in item:
         _md_user(item, verbose)
     else:
         _md_tweet(item, includes, title, verbose)
 
 
-def _md_tweet(tweet: dict, includes: dict, title: str = "", verbose: bool = False) -> None:
+def _md_tweet(
+    tweet: dict, includes: dict, title: str = "", verbose: bool = False
+) -> None:
     author = _resolve_author(tweet.get("author_id"), includes)
     text = tweet.get("text", "")
     tweet_id = tweet.get("id", "")
@@ -168,7 +211,9 @@ def _md_user(user: dict, verbose: bool = False) -> None:
             print(f"Joined: {created}")
 
 
-def _md_list(items: list, includes: dict, title: str = "", verbose: bool = False) -> None:
+def _md_list(
+    items: list, includes: dict, title: str = "", verbose: bool = False
+) -> None:
     if not items:
         return
     if title:
@@ -189,8 +234,14 @@ def _md_user_table(users: list, verbose: bool = False) -> None:
         for u in users:
             m = u.get("public_metrics", {})
             followers = f"{m.get('followers_count', 0):,}"
-            desc = (u.get("description", "") or "")[:60].replace("|", "/").replace("\n", " ")
-            print(f"| @{u.get('username', '')} | {u.get('name', '')} | {followers} | {desc} |")
+            desc = (
+                (u.get("description", "") or "")[:60]
+                .replace("|", "/")
+                .replace("\n", " ")
+            )
+            print(
+                f"| @{u.get('username', '')} | {u.get('name', '')} | {followers} | {desc} |"
+            )
     else:
         print("| Username | Name | Followers |")
         print("|----------|------|-----------|")
@@ -240,14 +291,18 @@ def _resolve_author(author_id: str | None, includes: dict) -> str:
     return author_id
 
 
-def _human_single(item: dict, includes: dict, title: str = "", verbose: bool = False) -> None:
+def _human_single(
+    item: dict, includes: dict, title: str = "", verbose: bool = False
+) -> None:
     if "username" in item:
         _human_user(item, verbose)
     else:
         _human_tweet(item, includes, title, verbose)
 
 
-def _human_tweet(tweet: dict, includes: dict, title: str = "", verbose: bool = False) -> None:
+def _human_tweet(
+    tweet: dict, includes: dict, title: str = "", verbose: bool = False
+) -> None:
     author = _resolve_author(tweet.get("author_id"), includes)
     text = tweet.get("text", "")
     tweet_id = tweet.get("id", "")
@@ -265,7 +320,10 @@ def _human_tweet(tweet: dict, includes: dict, title: str = "", verbose: bool = F
     if verbose:
         metrics = tweet.get("public_metrics", {})
         if metrics:
-            parts = [f"{k.replace('_count', '').replace('_', ' ')}: {v}" for k, v in metrics.items()]
+            parts = [
+                f"{k.replace('_count', '').replace('_', ' ')}: {v}"
+                for k, v in metrics.items()
+            ]
             content += f"\n\n[dim]{' | '.join(parts)}[/dim]"
 
     panel_title = title or f"Tweet {tweet_id}"
@@ -301,10 +359,14 @@ def _human_user(user: dict, verbose: bool = False) -> None:
     if metrics_parts:
         content += f"\n\n{' | '.join(metrics_parts)}"
 
-    _stdout.print(Panel(content, title=f"@{username}", border_style="green", expand=False))
+    _stdout.print(
+        Panel(content, title=f"@{username}", border_style="green", expand=False)
+    )
 
 
-def _human_tweet_list(items: list, includes: dict, title: str = "", verbose: bool = False) -> None:
+def _human_tweet_list(
+    items: list, includes: dict, title: str = "", verbose: bool = False
+) -> None:
     if items and "username" in items[0]:
         _human_user_table(items, title, verbose)
     else:
@@ -336,7 +398,10 @@ def _human_user_table(users: list, title: str = "", verbose: bool = False) -> No
 
 # ---- Router ----
 
-def format_output(data: Any, mode: str = "human", title: str = "", verbose: bool = False) -> None:
+
+def format_output(
+    data: Any, mode: str = "human", title: str = "", verbose: bool = False
+) -> None:
     """Route to the appropriate formatter."""
     if mode == "json":
         output_json(data, verbose)
